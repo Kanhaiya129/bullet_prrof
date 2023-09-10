@@ -22,6 +22,20 @@ class UserProfile(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self) -> str:
+        return self.user.username
+
     class Meta:
         verbose_name = "User Profile"
         verbose_name_plural = "User Profile"
+
+
+class AccountVerification(models.Model):
+    user = models.ForeignKey(User, null=False, on_delete=models.CASCADE, blank=False)
+    uid = models.CharField(max_length=150)
+    token = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Account Verification"
+        verbose_name_plural = "Account Verification"

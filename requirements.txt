@@ -1,9 +1,9 @@
 django-4-jet==1.0.9
 django-environ==0.11.2
 djangorestframework==3.14.0
+fcm-django==1.0.12
 feedparser==6.0.10
+grpcio-status==1.58.0
 mysqlclient==2.2.0
 pillow==10.0.0
 pip-chill==1.0.3
-requests==2.31.0
-tzdata==2023.3

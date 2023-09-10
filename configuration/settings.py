@@ -47,6 +47,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework.authtoken',
+    'rest_framework',
+    "fcm_django",
     'authentication',
 ]
 
@@ -65,7 +68,7 @@ ROOT_URLCONF = 'configuration.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -129,7 +132,59 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT= os.path.join(BASE_DIR,'static/')
 
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_URL = "/media/"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Optional ONLY IF you have initialized a firebase app already:
+# Visit https://firebase.google.com/docs/admin/setup/#python
+# for more options for the following:
+# Store an environment variable called GOOGLE_APPLICATION_CREDENTIALS
+# which is a path that point to a json file with your credentials.
+# Additional arguments are available: credentials, options, name
+# cred = credentials.Certificate(env("GOOGLE_APPLICATION_CREDENTIALS"))
+# FIREBASE_APP = initialize_app()
+# doctor_app=FIREBASE_APP = initialize_app(cred_doctor, name="doctor")
+# print(doctor_app.name)
+# To learn more, visit the docs here:
+# https://cloud.google.com/docs/authentication/getting-started>
+
+FCM_DJANGO_SETTINGS = {
+    # an instance of firebase_admin.App to be used as default for all fcm-django requests
+    # default: None (the default Firebase app)
+    "DEFAULT_FIREBASE_APP": None,
+    # default: _('FCM Django')
+    "APP_VERBOSE_NAME": "FCM Devices",
+    # true if you want to have only one active device per registered user at a time
+    # default: False
+    "ONE_DEVICE_PER_USER": True,
+    # devices to which notifications cannot be sent,
+    # are deleted upon receiving error response from FCM
+    # default: False
+    "DELETE_INACTIVE_DEVICES": True,
+    # Transform create of an existing Device (based on registration id) into
+    # an update. See the section
+    # "Update of device with duplicate registration ID" for more details.
+    "UPDATE_ON_DUPLICATE_REG_ID": True,
+}
+
+EMAIL_BACKEND=env("EMAIL_BACKEND")
+EMAIL_HOST_USER=env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD=env("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL=env("DEFAULT_FROM_EMAIL")
+EMAIL_HOST=env("EMAIL_HOST")
+EMAIL_USE_TLS=env("EMAIL_USE_TLS")
+EMAIL_PORT=env("EMAIL_PORT")
+
+
+# EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST_USER="bulletp347@gmail.com"
+# EMAIL_HOST_PASSWORD="wraemizbtpqbvosr"
+# DEFAULT_FROM_EMAIL="bulletp347@gmail.com"
+# EMAIL_HOST="smtp.gmail.com"
+# EMAIL_USE_TLS=True
+# EMAIL_PORT=587
