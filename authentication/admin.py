@@ -1,11 +1,22 @@
 from django.contrib import admin
-from authentication.models import UserProfile, AccountVerification
+from authentication.models import (
+    UserProfile,
+    AccountVerification,
+    ForgotPasswordAndPasscode,
+)
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 
+
 @admin.register(AccountVerification)
 class AccountVerificationAdmin(admin.ModelAdmin):
-    list_display=["user", "token"]
+    list_display = ["user", "token"]
+
+
+@admin.register(ForgotPasswordAndPasscode)
+class ForgotPasswordAndPasscodeAdmin(admin.ModelAdmin):
+    list_display = ["user", "token"]
+
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile

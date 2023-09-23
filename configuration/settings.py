@@ -179,12 +179,3 @@ DEFAULT_FROM_EMAIL=env("DEFAULT_FROM_EMAIL")
 EMAIL_HOST=env("EMAIL_HOST")
 EMAIL_USE_TLS=env("EMAIL_USE_TLS")
 EMAIL_PORT=env("EMAIL_PORT")
-
-
-# EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend"
-# EMAIL_HOST_USER="bulletp347@gmail.com"
-# EMAIL_HOST_PASSWORD="wraemizbtpqbvosr"
-# DEFAULT_FROM_EMAIL="bulletp347@gmail.com"
-# EMAIL_HOST="smtp.gmail.com"
-# EMAIL_USE_TLS=True
-# EMAIL_PORT=587
