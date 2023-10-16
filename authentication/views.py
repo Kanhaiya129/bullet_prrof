@@ -60,12 +60,6 @@ class RegistrationView(APIView):
         response = {"status": False, "errors": serializer.errors, "data": None}
         return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
-    # except Exception as e:
-    # return Response(
-    #     {"message": f"Something Went Wrong {e}"},
-    #     status=status.HTTP_400_BAD_REQUEST,
-    # )
-
 
 class UserLoginView(APIView):
     # Class bases view for user Login
@@ -180,7 +174,7 @@ class ForgotPasswordView(APIView):
                 # sending failure response
                 response = {
                     "status": False,
-                    "message": "Invalid credential",
+                    "message": "Invalid email",
                     "data": None,
                 }
                 return Response(
@@ -225,26 +219,39 @@ class ForgotPasswordView(APIView):
 
 def reset_password_check(request, uid, token):
     try:
-        uid = force_str(urlsafe_base64_decode(uid))
-        user = ForgotPasswordAndPasscode.objects.get(user_id=uid)
-        if default_token_generator.check_token(user.user, token):
-            user.user.set_password(request.POST.get("confirm_password"))
-            user.user.save()
-            user.delete()
-            return render(request, "admin/reset_successfully.html")
+        uid_decode = force_str(urlsafe_base64_decode(uid))
+        user = ForgotPasswordAndPasscode.objects.filter(user_id=uid_decode)
+        if user.exists():
+            user= user.first()
+            if default_token_generator.check_token(user.user, token):
+                user.user.set_password(request.POST.get("confirm_password"))
+                user.user.save()
+                user.delete()
+                return render(request, "admin/reset_successfully.html")
+            else:
+                return render(request, "admin/reset_expire_link.html")
         else:
-            return render(request, "admin/reset_expire_link.html")
+                return render(request, "admin/reset_expire_link.html")
     except (TypeError, ValueError, OverflowError, AccountVerification.DoesNotExist):
-        return render(request, "admin/verification_expire_link.html")
+        return render(request, "admin/reset_expire_link.html")
     
 def reset_password_form(request, uid, token):
     try:
-        uid = force_str(urlsafe_base64_decode(uid))
-        user = ForgotPasswordAndPasscode.objects.get(user_id=uid)
-        if default_token_generator.check_token(user.user, token):
-            return render(request, "email/reset_password.html")
+        uid_decode = force_str(urlsafe_base64_decode(uid))
+        user = ForgotPasswordAndPasscode.objects.filter(user_id=uid_decode)
+        if user.exists():
+            user= user.first()
+            if default_token_generator.check_token(user.user, token):
+                # Send uid and token to the reset_password.html template
+                return render(request, "email/reset_password.html", {'uid': uid, 'token': token})
+            else:
+                    print("###############")
+                    return render(request, "admin/reset_expire_link.html")
+        else:
+            print("@@@@@@@@@@")
+            return render(request, "admin/reset_expire_link.html")
     except (TypeError, ValueError, OverflowError, AccountVerification.DoesNotExist):
-        return render(request, "admin/verification_expire_link.html")
+        return render(request, "admin/reset_expire_link.html")
 
 
 def verify(request, uid, token):
@@ -257,6 +264,6 @@ def verify(request, uid, token):
             user.delete()
             return render(request, "admin/verify_email.html")
         else:
-            return render(request, "admin/verification_expire_link.html")
+            return render(request, "admin/reset_expire_link.html")
     except (TypeError, ValueError, OverflowError, AccountVerification.DoesNotExist):
-        return render(request, "admin/verification_expire_link.html")
+        return render(request, "admin/reset_expire_link.html")

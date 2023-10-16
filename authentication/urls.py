@@ -19,7 +19,7 @@ urlpatterns = [
 
 
     path("reset_password", ForgotPasswordView.as_view(), name="reset_password"),
-    path("reset_password_check/<str:uid>/<str:token>", reset_password_check, name="verify_email"),
-    path("reset_password_form/<str:uid>/<str:token>", reset_password_form, name="verify_email"),
+    path("reset_password_check/<str:uid>/<str:token>", reset_password_check, name="reset_password_check"),
+    path("reset_password_form/<str:uid>/<str:token>", reset_password_form, name="reset_password_form"),
     
 ]
