@@ -27,7 +27,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     )
     first_name = serializers.CharField(required=True)
     last_name = serializers.CharField(required=True)
-
+    profile_pic = serializers.ImageField()
     class Meta:
         model = User
         fields = [
@@ -41,6 +41,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "address",
             "gender",
             "geo_location",
+            "profile_pic"
         ]
 
     def create(self, validated_data):
@@ -52,12 +53,11 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "last_name": validated_data["last_name"],
         }
         extra_detail = {
-            "profile_pic": validated_data["profile_pic"]
-            if "profile_pic" in validated_data
-            else None,
+            "profile_pic": validated_data["profile_pic"],
             "passcode": urlsafe_base64_encode(force_bytes(validated_data["passcode"])),
             "address": validated_data["address"],
             "gender": validated_data["gender"],
+            
             "geo_location": validated_data["geo_location"],
             "login_type": validated_data["login_type"],
         }

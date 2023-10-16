@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
 
 
 # DropDown List items for gender field
@@ -15,7 +16,7 @@ TYPE = (("1", "Normal"), ("2", "Social"))
 class UserProfile(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, null=False, on_delete=models.CASCADE, blank=False)
-    profile_pic = models.ImageField(blank=True, null=True, upload_to="media")
+    profile_pic = models.ImageField(blank=True, null=True, upload_to=f"{settings.AWS_BASE_UPLOAD_PATH}/profile_pic")
     passcode = models.CharField(max_length=20)
     address = models.TextField()
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
