@@ -8,9 +8,8 @@ from authentication.serializers import (
     UserLoginSerializer,
     SocialLoginSerializer,
     PasscodeLoginSerializer,
-    PasswordResetSerializer,
+
 )
-from rest_framework.decorators import api_view
 from authentication.models import (
     AccountVerification,
     UserProfile,
@@ -20,21 +19,22 @@ from django.utils.encoding import force_str
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
-from django.contrib.sites.shortcuts import get_current_site
 
 from fcm_django.models import FCMDevice
 from services.send_email import send_user_activation_mail, send_user_resetpassword_mail
 
 
-def user_data(user_obj, api_token, fcm_token=None, device_type=None):
+def user_data(user_obj, api_token=None, fcm_token=None, device_type=None):
     user_obj = UserProfile.objects.get(user__username=user_obj)
     data = {
         "id": user_obj.user.id,
+        "username":user_obj.user.username,
         "name": user_obj.user.first_name,
         "email": user_obj.user.email,
         "profile_pic": user_obj.profile_pic.url if user_obj.profile_pic else None,
         "passcode": user_obj.passcode,
         "address": user_obj.address,
+        "phone_number":user_obj.phone_number,
         "gender": user_obj.gender,
         "geo_location": user_obj.geo_location,
         "fcm_token": fcm_token,

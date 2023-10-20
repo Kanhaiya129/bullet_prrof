@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'rest_framework',
     "fcm_django",
     'authentication',
+    "userprofile"
 ]
 
 MIDDLEWARE = [
@@ -97,7 +98,6 @@ DATABASES = {
         'PORT': env("DB_PORT"),
     }
 }
-print(env("USER"),"############")
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
