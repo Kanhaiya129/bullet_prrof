@@ -19,6 +19,7 @@ class UserProfile(models.Model):
     profile_pic = models.ImageField(blank=True, null=True, upload_to=f"{settings.AWS_BASE_UPLOAD_PATH}/profile_pic")
     passcode = models.CharField(max_length=20)
     address = models.TextField()
+    phone_number = models.CharField(max_length=50,null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     geo_location = models.CharField(max_length=150, null=True, blank=True, default=None)
     is_deleted = models.BooleanField(default=False)

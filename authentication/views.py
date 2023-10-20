@@ -11,7 +11,11 @@ from authentication.serializers import (
     PasswordResetSerializer,
 )
 from rest_framework.decorators import api_view
-from authentication.models import AccountVerification, UserProfile, ForgotPasswordAndPasscode
+from authentication.models import (
+    AccountVerification,
+    UserProfile,
+    ForgotPasswordAndPasscode,
+)
 from django.utils.encoding import force_str
 from rest_framework.authtoken.models import Token
 from django.contrib.auth.tokens import default_token_generator
@@ -22,17 +26,21 @@ from fcm_django.models import FCMDevice
 from services.send_email import send_user_activation_mail, send_user_resetpassword_mail
 
 
-def user_data(user_obj):
+def user_data(user_obj, api_token, fcm_token=None, device_type=None):
+    user_obj = UserProfile.objects.get(user__username=user_obj)
     data = {
         "id": user_obj.user.id,
-        "first_name": user_obj.user.first_name,
-        "last_name": user_obj.user.last_name,
+        "name": user_obj.user.first_name,
         "email": user_obj.user.email,
         "profile_pic": user_obj.profile_pic.url if user_obj.profile_pic else None,
         "passcode": user_obj.passcode,
         "address": user_obj.address,
         "gender": user_obj.gender,
         "geo_location": user_obj.geo_location,
+        "fcm_token": fcm_token,
+        "is_active":1 if user_obj.user.is_active else 0,
+        "device_type": device_type,
+        "api_token": api_token,
     }
     return data
 
@@ -43,21 +51,30 @@ class RegistrationView(APIView):
         # try:
         # Passing our data in the seriealizer
         serializer = RegistrationSerializer(data=request.data)
-
+        if User.objects.filter(username=request.data.get("username")).exists():
+            return Response(
+                {
+                    "code": 400,
+                    "message": "This username already taken.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if serializer.is_valid():
             user = serializer.save()  # Throws error if data is empty or not correct
             send_user_activation_mail(request, user)  # Send email for verify email
+            # Genrate Token if given username and password verify
+            token, _ = Token.objects.get_or_create(user=user)
             return Response(
                 {
-                    "status": True,
-                    "message": "User Registered Successfully, Please Check Email to verify You Account",
-                    "data": None,
+                    "code": 200,
+                    "message": "Record has been created successfully.",
+                    "data": user_data(user, token.key),
                 },
-                status=status.HTTP_201_CREATED,
+                status=status.HTTP_200_OK,
             )
 
         # All serializer error stores in errors
-        response = {"status": False, "errors": serializer.errors, "data": None}
+        response = {"code": 400, "errors": serializer.errors, "data": None}
         return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -74,7 +91,8 @@ class UserLoginView(APIView):
             user_detail_obj = UserProfile.objects.get(user=user_obj)
             # Deleting any previous stored token
             Token.objects.filter(user=user_obj).delete()
-
+            fcm_token = None
+            device_type = None
             if "fcm_token" in request.data:
                 # Set FCM token for user
                 fcm_device = FCMDevice()
@@ -82,14 +100,18 @@ class UserLoginView(APIView):
                 fcm_device.type = request.data["device_type"]
                 fcm_device.user = user_obj
                 fcm_device.save()
+                fcm_token = fcm_device.registration_id
+                device_type = fcm_device.type
 
             # Genrate Token if given username and password verify
             token, _ = Token.objects.get_or_create(user=user_obj)
             return Response(
                 {
-                    "status": True,
-                    "message": "Authentication Successful",
-                    "data": {"token": token.key, "user": user_data(user_detail_obj)},
+                    "code": 200,
+                    "message": "You have logged in successfully.",
+                    "data": {
+                        "user": user_data(user_detail_obj, token.key, fcm_token, device_type),
+                    },
                 },
                 status=status.HTTP_200_OK,
             )
@@ -222,7 +244,7 @@ def reset_password_check(request, uid, token):
         uid_decode = force_str(urlsafe_base64_decode(uid))
         user = ForgotPasswordAndPasscode.objects.filter(user_id=uid_decode)
         if user.exists():
-            user= user.first()
+            user = user.first()
             if default_token_generator.check_token(user.user, token):
                 user.user.set_password(request.POST.get("confirm_password"))
                 user.user.save()
@@ -231,22 +253,25 @@ def reset_password_check(request, uid, token):
             else:
                 return render(request, "admin/reset_expire_link.html")
         else:
-                return render(request, "admin/reset_expire_link.html")
+            return render(request, "admin/reset_expire_link.html")
     except (TypeError, ValueError, OverflowError, AccountVerification.DoesNotExist):
         return render(request, "admin/reset_expire_link.html")
-    
+
+
 def reset_password_form(request, uid, token):
     try:
         uid_decode = force_str(urlsafe_base64_decode(uid))
         user = ForgotPasswordAndPasscode.objects.filter(user_id=uid_decode)
         if user.exists():
-            user= user.first()
+            user = user.first()
             if default_token_generator.check_token(user.user, token):
                 # Send uid and token to the reset_password.html template
-                return render(request, "email/reset_password.html", {'uid': uid, 'token': token})
+                return render(
+                    request, "email/reset_password.html", {"uid": uid, "token": token}
+                )
             else:
-                    print("###############")
-                    return render(request, "admin/reset_expire_link.html")
+                print("###############")
+                return render(request, "admin/reset_expire_link.html")
         else:
             print("@@@@@@@@@@")
             return render(request, "admin/reset_expire_link.html")
@@ -264,6 +289,6 @@ def verify(request, uid, token):
             user.delete()
             return render(request, "admin/verify_email.html")
         else:
-            return render(request, "admin/reset_expire_link.html")
+            return render(request, "admin/verification_expire_link.html")
     except (TypeError, ValueError, OverflowError, AccountVerification.DoesNotExist):
-        return render(request, "admin/reset_expire_link.html")
+        return render(request, "admin/verification_expire_link.html")
