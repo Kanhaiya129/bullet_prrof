@@ -213,7 +213,3 @@ class PasscodeLoginSerializer(serializers.Serializer):
         if UserProfile.objects.filter(user__email=email, passcode=decode_passcode).exists():
             return super().validate(attrs)
         raise serializers.ValidationError("Invalid Credential")
-
-
-class PasswordResetSerializer(serializers.Serializer):
-    email = serializers.EmailField()
