@@ -17,6 +17,7 @@ class UpdateUserProfileSerializer(serializers.ModelSerializer):
             "gender",
             "geo_location",
             "username",
+            "slug",
             "name",
         ]
 

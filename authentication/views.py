@@ -8,7 +8,6 @@ from authentication.serializers import (
     UserLoginSerializer,
     SocialLoginSerializer,
     PasscodeLoginSerializer,
-
 )
 from authentication.models import (
     AccountVerification,
@@ -24,23 +23,24 @@ from fcm_django.models import FCMDevice
 from services.send_email import send_user_activation_mail, send_user_resetpassword_mail
 
 
-def user_data(user_obj, api_token=None, fcm_token=None, device_type=None):
+def user_data(user_obj, fcm_token=None, device_type=None):
     user_obj = UserProfile.objects.get(user__username=user_obj)
+    token, _ = Token.objects.get_or_create(user=user_obj.user)
     data = {
         "id": user_obj.user.id,
-        "username":user_obj.user.username,
+        "username": user_obj.user.username,
         "name": user_obj.user.first_name,
         "email": user_obj.user.email,
         "profile_pic": user_obj.profile_pic.url if user_obj.profile_pic else None,
         "passcode": user_obj.passcode,
         "address": user_obj.address,
-        "phone_number":user_obj.phone_number,
+        "phone_number": user_obj.phone_number,
         "gender": user_obj.gender,
         "geo_location": user_obj.geo_location,
         "fcm_token": fcm_token,
-        "is_active":1 if user_obj.user.is_active else 0,
+        "is_active": 1 if user_obj.user.is_active else 0,
         "device_type": device_type,
-        "api_token": api_token,
+        "api_token": token.key,
     }
     return data
 
@@ -48,34 +48,41 @@ def user_data(user_obj, api_token=None, fcm_token=None, device_type=None):
 # Create your views here.
 class RegistrationView(APIView):
     def post(self, request, format=None):
-        # try:
-        # Passing our data in the seriealizer
+        email = request.data.get("email")
+        username = request.data.get("username")
+
+        # Check if a user with the same email and username exists and is not active
+        existing_user = User.objects.filter(
+            email=email, username=username
+        )
+        if existing_user.exists():
+            if existing_user.first().is_active==False:
+                existing_user.delete()
+            else:
+                return Response({
+                    "code":400,
+                    "message":"Duplicate email or username"
+                },status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create a new user
         serializer = RegistrationSerializer(data=request.data)
-        if User.objects.filter(username=request.data.get("username")).exists():
-            return Response(
-                {
-                    "code": 400,
-                    "message": "This username already taken.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+
         if serializer.is_valid():
-            user = serializer.save()  # Throws error if data is empty or not correct
-            send_user_activation_mail(request, user)  # Send email for verify email
-            # Genrate Token if given username and password verify
-            token, _ = Token.objects.get_or_create(user=user)
+            user = serializer.save()
+            print(user)
+            send_user_activation_mail(request, user)
             return Response(
                 {
                     "code": 200,
                     "message": "Record has been created successfully.",
-                    "data": user_data(user, token.key),
+                    "data": user_data(user),
                 },
                 status=status.HTTP_200_OK,
             )
 
-        # All serializer error stores in errors
-        response = {"code": 400, "errors": serializer.errors, "data": None}
-        return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response = {"code": 400, "errors": serializer.errors, "data": None}
+            return Response(data=response, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserLoginView(APIView):
@@ -110,7 +117,9 @@ class UserLoginView(APIView):
                     "code": 200,
                     "message": "You have logged in successfully.",
                     "data": {
-                        "user": user_data(user_detail_obj, token.key, fcm_token, device_type),
+                        "user": user_data(
+                            user_detail_obj, token.key, fcm_token, device_type
+                        ),
                     },
                 },
                 status=status.HTTP_200_OK,
