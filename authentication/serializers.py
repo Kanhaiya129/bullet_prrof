@@ -8,7 +8,11 @@ from django.contrib.auth import authenticate
 from services.send_email import send_user_activation_mail
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
-
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from django.conf import settings
+import base64
+import uuid
 
 class RegistrationSerializer(serializers.ModelSerializer):
     login_type = serializers.CharField(required=True)
@@ -16,19 +20,13 @@ class RegistrationSerializer(serializers.ModelSerializer):
     address = serializers.CharField(required=True)
     gender = serializers.CharField(required=True)
     geo_location = serializers.CharField()
-    email = serializers.EmailField(
-        required=True,
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(),
-                message=("Email already exists"),
-            )
-        ],
-    )
+    email = serializers.EmailField(required=True)
     name = serializers.CharField(required=True)
-    profile_pic = serializers.ImageField()
-    phone_number = serializers.CharField()
-    username= serializers.CharField()
+    profile_picture = serializers.CharField()
+    mobile_no = serializers.CharField()
+    username = serializers.CharField()
+    slug = serializers.CharField()
+
     class Meta:
         model = User
         fields = [
@@ -41,25 +39,35 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "passcode",
             "address",
             "gender",
-            "phone_number",
+            "mobile_no",
             "geo_location",
-            "profile_pic"
+            "profile_picture",
+            "slug",
         ]
 
     def create(self, validated_data):
+        base64_data = validated_data.get("profile_picture")
+        filename = f'public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png'
+
+        # Decode and save the Base64 data to S3
+        image_data = base64.b64decode(base64_data.encode())
+        image_file = ContentFile(image_data, name=filename)
+        default_storage.save(filename, image_file)
+        # Get the full S3 URL
+
         user_details = {
             "username": validated_data["username"],
             "email": validated_data["email"],
             "password": make_password(validated_data["password"]),
             "first_name": validated_data["name"],
-            }
+        }
         extra_detail = {
-            "profile_pic": validated_data["profile_pic"],
-            "phone_number":validated_data["phone_number"],
+            "profile_pic": filename,
+            "slug": validated_data["slug"],
+            "phone_number": validated_data["mobile_no"],
             "passcode": urlsafe_base64_encode(force_bytes(validated_data["passcode"])),
             "address": validated_data["address"],
             "gender": validated_data["gender"],
-            
             "geo_location": validated_data["geo_location"],
             "login_type": validated_data["login_type"],
         }
@@ -69,16 +77,16 @@ class RegistrationSerializer(serializers.ModelSerializer):
             user.save()
             UserProfile.objects.create(user=user, **extra_detail)
         return user
-
+    
     def validate(self, attrs):
         if attrs.get("login_type") == "2":
             raise serializers.ValidationError(
                 {"error": "Please enter valid login type"}
             )
-        if UserProfile.objects.filter(user__email=attrs.get("email")).exists():
-            raise serializers.ValidationError({"error": "Account is disabled by admin"})
         if UserProfile.objects.filter(
-            user__email=attrs.get("email"), login_type="2"
+            user__email=attrs.get("email"),
+            login_type="2",
+            user__is_active=True,
         ).exists():
             user_detail = UserProfile.objects.get(user_email=attrs.get("email"))
             raise serializers.ValidationError(
@@ -210,6 +218,8 @@ class PasscodeLoginSerializer(serializers.Serializer):
         email = attrs.get("email")
         passcode = attrs.get("passcode")
         decode_passcode = urlsafe_base64_encode(force_bytes(passcode))
-        if UserProfile.objects.filter(user__email=email, passcode=decode_passcode).exists():
+        if UserProfile.objects.filter(
+            user__email=email, passcode=decode_passcode
+        ).exists():
             return super().validate(attrs)
         raise serializers.ValidationError("Invalid Credential")
