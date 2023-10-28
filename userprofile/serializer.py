@@ -1,6 +1,10 @@
+import base64
+import uuid
 from rest_framework import serializers
 from authentication.models import UserProfile
 from django.contrib.auth.hashers import check_password
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 
 class UpdateUserProfileSerializer(serializers.ModelSerializer):
@@ -11,8 +15,6 @@ class UpdateUserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = [
             "profile_pic",
-            "phone_number",
-            "passcode",
             "address",
             "gender",
             "geo_location",
@@ -22,13 +24,27 @@ class UpdateUserProfileSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
+        filename = None
+        if "profile_picture" in validated_data and "profile_picture" != "":
+            base64_data = validated_data.get("profile_picture")
+            filename = f"public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png"
+
+            # Decode and save the Base64 data to S3
+            image_data = base64.b64decode(base64_data.encode())
+            image_file = ContentFile(image_data, name=filename)
+            default_storage.save(filename, image_file)
+
         # Set the 'username' and 'first_name' attributes of the related 'User' model
+        instance.profile_pic = filename
         instance.user.username = validated_data.get("username")
         instance.user.first_name = validated_data.get("name")
         try:
+            instance.save()
             instance.user.save()
         except:
-            raise serializers.ValidationError({"error": "This username already taken"})
+            raise serializers.ValidationError(
+                {"error": ["This username already taken"]}
+            )
         return super().update(instance, validated_data)
 
 
@@ -60,9 +76,7 @@ class ChangePasswordSerializer(serializers.Serializer):
         confirm_password = attrs.get("confirm_password")
         matchcheck = check_password(current_password, user.password)
         if not matchcheck:
-            raise serializers.ValidationError(
-                "Current password is not valid"
-            )
+            raise serializers.ValidationError("Current password is not valid")
         # Check if the old password and new password are the same
         if confirm_password != new_password:
             raise serializers.ValidationError(
@@ -71,6 +85,6 @@ class ChangePasswordSerializer(serializers.Serializer):
         # Check if the old password and new password are the same
         if current_password == new_password:
             raise serializers.ValidationError(
-                "You can't set a new password same as current password"
+                {"error": ["You can't set a new password same as current password"]}
             )
         return attrs
