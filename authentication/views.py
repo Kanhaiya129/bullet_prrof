@@ -136,7 +136,7 @@ def user_data(user_obj, fcm_token=None, device_type=None):
         "username": user_obj.user.username,
         "name": user_obj.user.first_name,
         "email": user_obj.user.email,
-        "profile_pic": user_obj.profile_pic.url if user_obj.profile_pic else None,
+        "profile_picture": user_obj.profile_pic.url if user_obj.profile_pic else None,
         "passcode": user_obj.passcode,
         "address": user_obj.address,
         "phone_number": user_obj.phone_number,
@@ -231,7 +231,6 @@ class UserSocialLoginView(APIView):
 
         if serializer.is_valid():
             user_obj = serializer.save()
-            print(user_obj)
             user_detail = UserProfile.objects.get(user=user_obj.id)
 
             return Response(
@@ -460,9 +459,7 @@ class ChangePasscodeView(APIView):
         )
         if serializer.is_valid():
             user_obj = UserProfile.objects.filter(user__username=request.user).first()
-            print(user_obj.passcode, "Codednjjb")
             decode_new_passcode = serializer.validated_data
-            print(decode_new_passcode, "DEccode")
             user_obj.passcode = decode_new_passcode
             user_obj.save()
             return Response(

@@ -1,3 +1,5 @@
+import base64
+import uuid
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth.models import User
@@ -7,6 +9,8 @@ from authentication.views import user_data
 from userprofile.serializer import UpdateUserProfileSerializer, ChangePasswordSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 
 
 class UserProfileView(APIView):
@@ -37,6 +41,19 @@ class UserProfileView(APIView):
         user_detail_obj = UserProfile.objects.filter(
             user__username=user.username
         ).first()
+        filename = None
+        if "profile_picture" in request.data and "profile_picture" != "":
+            base64_data = request.data.get("profile_picture")
+            if base64_data:
+                filename = f"public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png"
+
+                # Decode and save the Base64 data to S3
+                image_data = base64.b64decode(base64_data.encode())
+                image_file = ContentFile(image_data, name=filename)
+                default_storage.save(filename, image_file)
+                user_detail_obj.profile_pic = filename
+                user_detail_obj.save()
+            
         serializer = UpdateUserProfileSerializer(user_detail_obj, data=request.data)
         if serializer.is_valid():
             user = serializer.save()

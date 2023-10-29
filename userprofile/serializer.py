@@ -1,10 +1,8 @@
-import base64
-import uuid
+
 from rest_framework import serializers
 from authentication.models import UserProfile
 from django.contrib.auth.hashers import check_password
-from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
+
 
 
 class UpdateUserProfileSerializer(serializers.ModelSerializer):
@@ -14,7 +12,6 @@ class UpdateUserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
         fields = [
-            "profile_pic",
             "address",
             "gender",
             "geo_location",
@@ -24,18 +21,6 @@ class UpdateUserProfileSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
-        filename = None
-        if "profile_picture" in validated_data and "profile_picture" != "":
-            base64_data = validated_data.get("profile_picture")
-            filename = f"public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png"
-
-            # Decode and save the Base64 data to S3
-            image_data = base64.b64decode(base64_data.encode())
-            image_file = ContentFile(image_data, name=filename)
-            default_storage.save(filename, image_file)
-
-        # Set the 'username' and 'first_name' attributes of the related 'User' model
-        instance.profile_pic = filename
         instance.user.username = validated_data.get("username")
         instance.user.first_name = validated_data.get("name")
         try:
