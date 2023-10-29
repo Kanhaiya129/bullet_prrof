@@ -10,22 +10,41 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
-from django.conf import settings
+from fcm_django.models import FCMDevice
 import base64
 import uuid
+import secrets
+import string
+from django.db.models import Q
+
 
 class RegistrationSerializer(serializers.ModelSerializer):
     login_type = serializers.CharField(required=True)
     passcode = serializers.CharField(required=True)
-    address = serializers.CharField(required=True)
-    gender = serializers.CharField(required=True)
-    geo_location = serializers.CharField()
-    email = serializers.EmailField(required=True)
+    # address = serializers.CharField(required=False)
+    # gender = serializers.CharField(required=False)
+    # geo_location = serializers.CharField(required=False)
+    email = serializers.EmailField(
+        required=True,
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message=("Email already exists"),
+            )
+        ],
+    )
     name = serializers.CharField(required=True)
-    profile_picture = serializers.CharField()
-    mobile_no = serializers.CharField()
+    # profile_picture = serializers.CharField(required=False)
+    # phone_number = serializers.CharField(required=False,
+    #     validators=[
+    #         UniqueValidator(
+    #             queryset=UserProfile.objects.all(),
+    #             message=("Mobile Number Already Exists"),
+    #         )
+    #     ],
+    # )
     username = serializers.CharField()
-    slug = serializers.CharField()
+    # slug = serializers.CharField(required=False)
 
     class Meta:
         model = User
@@ -35,24 +54,25 @@ class RegistrationSerializer(serializers.ModelSerializer):
             "email",
             "password",
             "name",
-            "password",
             "passcode",
-            "address",
-            "gender",
-            "mobile_no",
-            "geo_location",
-            "profile_picture",
-            "slug",
+            # "address",
+            # "gender",
+            # "phone_number",
+            # "geo_location",
+            # "profile_picture",
+            # "slug",
         ]
 
     def create(self, validated_data):
-        base64_data = validated_data.get("profile_picture")
-        filename = f'public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png'
+        filename = None
+        if "profile_picture" in validated_data and "profile_picture" != "":
+            base64_data = validated_data.get("profile_picture")
+            filename = f"public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png"
 
-        # Decode and save the Base64 data to S3
-        image_data = base64.b64decode(base64_data.encode())
-        image_file = ContentFile(image_data, name=filename)
-        default_storage.save(filename, image_file)
+            # Decode and save the Base64 data to S3
+            image_data = base64.b64decode(base64_data.encode())
+            image_file = ContentFile(image_data, name=filename)
+            default_storage.save(filename, image_file)
         # Get the full S3 URL
 
         user_details = {
@@ -63,12 +83,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
         }
         extra_detail = {
             "profile_pic": filename,
-            "slug": validated_data["slug"],
-            "phone_number": validated_data["mobile_no"],
+            "slug": validated_data["slug"] if "slug" in validated_data else None,
+            "phone_number": validated_data["phone_number"] if "phone_number" in validated_data else None,
             "passcode": urlsafe_base64_encode(force_bytes(validated_data["passcode"])),
-            "address": validated_data["address"],
-            "gender": validated_data["gender"],
-            "geo_location": validated_data["geo_location"],
+            "address": validated_data["address"] if "address" in validated_data else None,
+            "gender": validated_data["gender"] if "gender" in validated_data else None,
+            "geo_location":validated_data["geo_location"] if "geo_location" in validated_data else None,
             "login_type": validated_data["login_type"],
         }
         with transaction.atomic():
@@ -77,11 +97,11 @@ class RegistrationSerializer(serializers.ModelSerializer):
             user.save()
             UserProfile.objects.create(user=user, **extra_detail)
         return user
-    
+
     def validate(self, attrs):
         if attrs.get("login_type") == "2":
             raise serializers.ValidationError(
-                {"error": "Please enter valid login type"}
+                {"error": ["Please enter valid login type"]}
             )
         if UserProfile.objects.filter(
             user__email=attrs.get("email"),
@@ -91,7 +111,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             user_detail = UserProfile.objects.get(user_email=attrs.get("email"))
             raise serializers.ValidationError(
                 {
-                    "error": f"You already registred with {user_detail.social_media_type}. So please login with {user_detail.social_media_type}"
+                    "error": [f"You already registred with {user_detail.social_media_type}. So please login with {user_detail.social_media_type}"]
                 }
             )
         return super().validate(attrs)
@@ -111,7 +131,7 @@ class UserLoginSerializer(serializers.ModelSerializer):
         # If entered email doesn't exist
         if not User.objects.filter(email=attrs.get("email")).exists():
             raise serializers.ValidationError(
-                {"error": "No user exist with this email"}
+                {"error": ["No user exist with this email"]}
             )
 
         # If the user is not active or deleted
@@ -120,7 +140,7 @@ class UserLoginSerializer(serializers.ModelSerializer):
             request = self.context.get("request")
             send_user_activation_mail(request, user)
             raise serializers.ValidationError(
-                {"error": "Account not verified please verify your account"}
+                {"error": ["Account not verified please verify your account"]}
             )
 
         username = User.objects.get(email=attrs.get("email")).username
@@ -129,7 +149,7 @@ class UserLoginSerializer(serializers.ModelSerializer):
         if user is not None:
             if UserProfile.objects.filter(user=user, is_deleted=True).exists():
                 raise serializers.ValidationError(
-                    {"error": "Account is disabled By Admin"}
+                    {"error": ["Account is disabled By Admin"]}
                 )
             return attrs
         else:
@@ -138,67 +158,78 @@ class UserLoginSerializer(serializers.ModelSerializer):
 
 class SocialLoginSerializer(serializers.Serializer):
     login_type = serializers.CharField(required=True)
-    first_name = serializers.CharField(required=True)
-    last_name = serializers.CharField(required=True)
-    social_media_id = serializers.CharField(required=True)
-    social_media_type = serializers.CharField(required=True)
+    name = serializers.CharField(required=True)
+    platform_id = serializers.CharField(required=True)
+    platform_type = serializers.CharField(required=True)
     email = serializers.EmailField(required=True)
 
     class Meta:
         fields = [
             "login_type",
             "email",
-            "first_name",
-            "last_name",
-            "social_media_id",
-            "social_media_type",
+            "name",
+            "platform_id",
+            "platform_type",
             "password",
         ]
 
     def validate(self, attrs):
         if attrs.get("login_type") == "1":
             raise serializers.ValidationError(
-                {"error": "Please enter valid login type"}
+                {"error": ["Please enter valid login type"]}
             )
         if UserProfile.objects.filter(
             user__email=attrs.get("email"), is_deleted=True
         ).exists():
-            raise serializers.ValidationError({"error": "Account is disabled by admin"})
+            raise serializers.ValidationError({"error": ["Account is disabled by admin"]})
         if UserProfile.objects.filter(
             user__email=attrs.get("email"), login_type="1"
         ).exists():
             user_detail = UserProfile.objects.get(user_email=attrs.get("email"))
             raise serializers.ValidationError(
                 {
-                    "error": f"You already registred with standard login. So please login with Standard"
+                    "error": [f"You already registred with standard login. So please login with Standard"]
                 }
             )
         return super().validate(attrs)
 
     def create(self, validated_data):
         if not User.objects.filter(email=validated_data.get("email")).exists():
+            filename = None
+            if "profile_picture" in validated_data and "profile_picture" != "":
+                base64_data = validated_data.get("profile_picture")
+                filename = f"public/bullet_proof/profile_pic/{str(uuid.uuid4())}.png"
+
+                # Decode and save the Base64 data to S3
+                image_data = base64.b64decode(base64_data.encode())
+                image_file = ContentFile(image_data, name=filename)
+                default_storage.save(filename, image_file)
+
             user_details = {
                 "username": validated_data["email"].split("@")[0],
                 "email": validated_data["email"],
-                "password": make_password(validated_data["password"]),
-                "first_name": validated_data["first_name"],
-                "last_name": validated_data["last_name"],
+                "password": make_password(
+                    "".join(
+                        secrets.choice(string.digits + string.punctuation)
+                        for _ in range(12)
+                    )
+                ),
+                "first_name": validated_data["name"],
             }
             extra_detail = {
-                "profile_pic": validated_data["profile_pic"],
-                "passcode": urlsafe_base64_encode(
-                    force_bytes(validated_data["passcode"])
-                ),
-                "address": validated_data["address"],
-                "gender": validated_data["gender"],
-                "geo_location": validated_data["geo_location"],
-                "social_media_id": validated_data["social_media_id"],
-                "social_media_type": validated_data["social_media_type"],
+                "profile_pic": filename,
+                "passcode": None,
+                "address": None,
+                "gender": None,
+                "slug": None,
+                "geo_location": None,
+                "platform_id": validated_data["platform_id"],
+                "platform_type": validated_data["platform_type"],
                 "login_type": validated_data["login_type"],
             }
             with transaction.atomic():
                 user = User.objects.create(**user_details)
-                user.is_active = False
+                user.is_active = True
                 user.save()
                 UserProfile.objects.create(user=user, **extra_detail)
             return user
@@ -208,18 +239,84 @@ class SocialLoginSerializer(serializers.Serializer):
 
 
 class PasscodeLoginSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=True)
+    userId = serializers.CharField(required=True)
     passcode = serializers.IntegerField(required=True)
 
     class Meta:
-        fields = ["email", "passcode"]
+        fields = ["userId", "passcode"]
 
     def validate(self, attrs):
-        email = attrs.get("email")
+        userId = attrs.get("userId")
         passcode = attrs.get("passcode")
         decode_passcode = urlsafe_base64_encode(force_bytes(passcode))
-        if UserProfile.objects.filter(
-            user__email=email, passcode=decode_passcode
-        ).exists():
+        user_detail_obj = UserProfile.objects.filter(
+            user_id=userId, passcode=decode_passcode
+        )
+        if user_detail_obj.exists():
             return super().validate(attrs)
-        raise serializers.ValidationError("Invalid Credential")
+        raise serializers.ValidationError({"error": ["Invalid Credential"]})
+
+
+class CheckUserSerializer(serializers.Serializer):
+    name = serializers.CharField(required=True)
+    username = serializers.CharField(required=True)
+    slug = serializers.CharField(required=False)
+    email = serializers.EmailField(required=True)
+    phone_number = serializers.CharField(required=False)
+
+    class Meta:
+        fields = ["name", "username", "slug", "email", "phone_number"]
+
+    def validate(self, attrs):
+        phone_number = attrs.get("phone_number")
+        if UserProfile.objects.filter(
+            Q(user__username=attrs.get("username"))
+            | Q() if phone_number is None else Q(phone_number=phone_number)
+            | Q(user__email=attrs.get("email"))
+        ).exists(): 
+            raise serializers.ValidationError(
+                {"error": ["duplication of username or email or mobile number"]}
+            )
+        return super().validate(attrs)
+
+
+class SetPasscodeSerializer(serializers.Serializer):
+    new_passcode = serializers.IntegerField(required=True)
+    confirm_passcode = serializers.IntegerField(required=True)
+    fcm_token = serializers.CharField(required=True)
+
+    class Meta:
+        fields = ["new_passcode", "confirm_passcode", "fcm_token"]
+
+    def update(self, instance, validated_data):
+        instance.passcode = urlsafe_base64_encode(
+            force_bytes(validated_data["new_passcode"])
+        )
+        instance.save()
+        return instance
+
+    def validate(self, attrs):
+        if attrs.get("new_passcode") != attrs.get("confirm_passcode"):
+            raise serializers.ValidationError(
+                {"error": ["Your confirm passcode must be same to new passcode"]}
+            )
+        return super().validate(attrs)
+
+class ChangePasscodeSerializer(serializers.Serializer):
+    new_passcode = serializers.CharField(required=True)
+    confirm_passcode = serializers.CharField(required=True)
+
+    class Meta:
+        fields = ["new_passcode", "confirm_passcode"]
+
+    def validate(self, attrs):
+        user = self.context.get("user")
+        new_password = attrs.get("new_passcode")
+        confirm_passcode = attrs.get("confirm_passcode")
+        user = UserProfile.objects.filter(user__username=user).first()
+        decode_new_passcode=urlsafe_base64_encode(force_bytes(new_password))
+        if user.passcode == decode_new_passcode:
+            raise serializers.ValidationError({"error":["Unable to change your Passcode"]})
+        if new_password != confirm_passcode:
+            raise serializers.ValidationError({"error":["Your confirm passcode must be same to new passcode"]})
+        return decode_new_passcode

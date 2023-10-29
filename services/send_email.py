@@ -66,4 +66,28 @@ def send_user_resetpassword_mail(request, user):
     return True
 
 
+def send_user_passcode_mail(request, user):
 
+    # Generate a token for email verification
+    token = default_token_generator.make_token(user)
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+    ForgotPasswordAndPasscode.objects.filter(user=user, is_passcode=True).delete()
+
+    ForgotPasswordAndPasscode.objects.create(user=user, uid=uid, token=token, is_passcode=True)
+
+    # Construct the password_reset_url
+    passcode_reset_url = f"http://{get_current_site(request)}/api/reset_passcode_form/{uid}/{token}"
+
+    subject = "Reset Your Passcode"
+    data = {"passcode_reset_url": passcode_reset_url,"uid":uid,"token":token}
+    message = get_template("email/forgot_passcode_email.html").render(data)
+    mail = EmailMessage(
+        subject=subject,
+        body=message,
+        from_email=settings.EMAIL_HOST_USER,
+        to=[user.email],
+        reply_to=[settings.EMAIL_HOST_USER],
+    )
+    mail.content_subtype = "html"
+    mail.send()
