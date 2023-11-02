@@ -51,7 +51,8 @@ INSTALLED_APPS = [
     'rest_framework',
     "fcm_django",
     'authentication',
-    "userprofile"
+    "userprofile",
+    "communication"
 ]
 
 MIDDLEWARE = [

@@ -1,8 +1,7 @@
-
 from rest_framework import serializers
 from authentication.models import UserProfile
 from django.contrib.auth.hashers import check_password
-
+from django.contrib.auth.models import User
 
 
 class UpdateUserProfileSerializer(serializers.ModelSerializer):
@@ -73,3 +72,28 @@ class ChangePasswordSerializer(serializers.Serializer):
                 {"error": ["You can't set a new password same as current password"]}
             )
         return attrs
+
+
+class UserDataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id","username", "email", "first_name"]
+
+
+class ListUserSerializer(serializers.ModelSerializer):
+    user = UserDataSerializer()
+
+    class Meta:
+        model = UserProfile
+        fields = [
+            "user",
+            "profile_pic",
+            "address",
+            "phone_number",
+            "gender",
+            "geo_location",
+            "slug",
+            "platform_type",
+            "platform_id",
+            "user"
+        ]
