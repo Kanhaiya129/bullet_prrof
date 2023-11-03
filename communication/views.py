@@ -3,11 +3,13 @@ from rest_framework import status
 from django.contrib.auth.models import User
 from .models import FriendUser, BlockUser, ChatRoomUser
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
+from services.pagination import CustomPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import TokenAuthentication
 from django.db.models import Q
 from authentication.models import UserProfile
-from .serializer import FriendInvitationSerializer, FriendSuggestionSerializer
+from .serializer import FriendInvitationSerializer, FriendSuggestionSerializer, UserProfileSerializer
 
 
 class SendFriendRequestView(APIView):
@@ -153,7 +155,7 @@ class RejectFriendRequest(APIView):
         except FriendUser.DoesNotExist:
             return Response(
                 {"code": 400, "message": "Friend request not found"},
-                status=status.HTTP_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST,
             )
         except Exception as err:
             return Response({"message": str(err)}, status=status.HTTP_400_BAD_REQUEST)
@@ -166,6 +168,7 @@ class BlockUserView(APIView):
     def post(self, request):
         try:
             user_id = request.query_params.get("user_id")
+            print(user_id,"##########")
             current_user = request.user
             block_user = User.objects.get(id=user_id)
             # Check if the user is attempting to block or unblock the target user
@@ -182,7 +185,7 @@ class BlockUserView(APIView):
                 )
             else:
                 # Block the user
-                blocked_user = BlockUser(user=current_user, blocked_user=user_id)
+                blocked_user = BlockUser(user=current_user, blocked_user=block_user)
                 blocked_user.save()
                 return Response(
                     {"code": 200, "message": "User blocked successfully"},
@@ -193,9 +196,11 @@ class BlockUserView(APIView):
             return Response({"message": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class GetFriendsByUser(APIView):
+class GetFriendsByUser(ListAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
+    serializer_class = UserProfileSerializer
 
     def get(self, request):
         try:
@@ -203,38 +208,24 @@ class GetFriendsByUser(APIView):
             # Get the IDs of blocked users
             blocked_users = BlockUser.objects.filter(user=user)
             blocked_user_ids = [blocked.blocked_user.id for blocked in blocked_users]
-
             # Get the friends of the user with chat room information
             friends = FriendUser.objects.filter(user=user, status=True)
             friend_ids = [friend.friend.id for friend in friends]
-
             chat_users = ChatRoomUser.objects.filter(user_id__in=friend_ids)
             chat_room_ids = [chat_user.chat_room_id for chat_user in chat_users]
 
             friend_data = UserProfile.objects.filter(user_id__in=friend_ids).exclude(
                 user_id__in=blocked_user_ids
             )
+            if friend_data:
+                page = self.paginate_queryset(friend_data)
+                serializer = self.serializer_class(page, many=True)
+                result = self.get_paginated_response(serializer.data)
+                data = result.data
+            
 
-            # Prepare the data
-            friend_list = []
-            for friend in friend_data:
-                friend_dict = {
-                    "id": friend.user.id,
-                    "name": friend.user.first_name,
-                    "profile_picture": friend.profile_pic.url
-                    if friend.profile_pic
-                    else None,
-                    "username": friend.user.username,
-                    "email": friend.user.email,
-                    "phone_number": friend.phone_number,
-                    "online_status": friend.online_status,
-                    "is_blocked": 1 if friend.id in blocked_user_ids else 0,
-                }
-                friend_list.append(friend_dict)
-
-            if friend_list:
                 return Response(
-                    {"code": 200, "message": "Success", "data": friend_list},
+                    {"code": 200, "message": "Success", "data": data},
                     status=status.HTTP_200_OK,
                 )
             else:
@@ -247,9 +238,12 @@ class GetFriendsByUser(APIView):
             return Response({"message": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class GetFriendInvitationsByUser(APIView):
+class GetFriendInvitationsByUser(ListAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
+    serializer_class = FriendInvitationSerializer
+
 
     def get(self, request):
         try:
@@ -257,17 +251,18 @@ class GetFriendInvitationsByUser(APIView):
             # Get friend invitations where status is 0 (pending) and the inviting user is not the current user
             friend_invitations = FriendUser.objects.filter(
                 status=False,
-                invited_by__ne=user,  # Exclude the current user as the inviter
+                invited_by=user,  # Exclude the current user as the inviter
                 user=user,
             )
-
-            # Serialize the data
-            serializer = FriendInvitationSerializer(friend_invitations, many=True)
+            page = self.paginate_queryset(friend_invitations)
+            serializer = self.serializer_class(page, many=True)
+            result = self.get_paginated_response(serializer.data)
+            data = result.data
 
             response_data = {
                 "code": 200,
                 "message": "Success",
-                "data": serializer.data,
+                "data": data,
             }
 
             return Response(response_data, status=status.HTTP_200_OK)
@@ -277,9 +272,11 @@ class GetFriendInvitationsByUser(APIView):
             return Response(error_response, status=status.HTTP_400_BAD_REQUEST)
 
 
-class GetFriendSuggestionsByUser(APIView):
+class GetFriendSuggestionsByUser(ListAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
+    serializer_class = FriendSuggestionSerializer
 
     def get(self, request):
         try:
@@ -300,14 +297,15 @@ class GetFriendSuggestionsByUser(APIView):
 
             # Limit the number of suggestions to 20
             suggested_friends = suggested_friends[:20]
-
-            # Serialize the data
-            serializer = FriendSuggestionSerializer(suggested_friends, many=True)
+            page = self.paginate_queryset(suggested_friends)
+            serializer = self.serializer_class(page, many=True)
+            result = self.get_paginated_response(serializer.data)
+            data = result.data
 
             response_data = {
                 "code": 200,
                 "message": "Success",
-                "data": serializer.data,
+                "data": data,
             }
 
             return Response(response_data, status=status.HTTP_200_OK)
