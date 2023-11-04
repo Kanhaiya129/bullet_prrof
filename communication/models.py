@@ -9,7 +9,7 @@ class FriendUser(models.Model):
     status = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     def __str__(self) -> str:
         return f"{self.user.username}-with-{self.friend.username}"
 
@@ -25,7 +25,7 @@ class BlockUser(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
-        return f"{self.user.username}-block-{self.friend.username}"
+        return f"{self.user.username}-block-{self.blocked_user.username}"
 
     class Meta:
         verbose_name = "Block User"

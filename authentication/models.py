@@ -24,7 +24,7 @@ class UserProfile(models.Model):
     geo_location = models.CharField(max_length=150, null=True, blank=True, default=None)
     slug = models.CharField(max_length=150, null=True, blank=True,)
     is_deleted = models.BooleanField(default=False)
-    online_status = models.BooleanField(default=False)
+    online_status = models.IntegerField(default=0)
 
     platform_type = models.CharField(max_length=25, blank=True, null=True)
     platform_id = models.CharField(max_length=200, blank=True, null=True)

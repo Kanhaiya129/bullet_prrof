@@ -110,68 +110,53 @@ class UserChangePasswordView(APIView):
         )
 
 
-class UserView(ListAPIView):
+class UserView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
-    serializer_class = ListUserSerializer
 
     def get(self, request):
         userprofile_data = UserProfile.objects.all().exclude(
             user__username=request.user, user__is_superuser=True
         )
-        page = self.paginate_queryset(userprofile_data)
-        serializer = self.serializer_class(page, many=True)
-        result = self.get_paginated_response(serializer.data)
-        data = result.data
+        serializer = ListUserSerializer(userprofile_data, many=True)
         response = {
             "status": True,
             "message": "All User fetch Successfully",
-            "data": data,
+            "data": serializer.data,
         }
         return Response(data=response, status=status.HTTP_200_OK)
 
 
-class GetUserByMobileNumberView(ListAPIView):
+class GetUserByMobileNumberView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
-    serializer_class = ListUserSerializer
 
     def get(self, request):
         mobile_no = request.query_params.get("mobile_no")
         user_profiles = UserProfile.objects.filter(
             phone_number__startswith=mobile_no
         ).exclude(user__username=request.user, user__is_superuser=True)
-        page = self.paginate_queryset(user_profiles)
-        serializer = self.serializer_class(page, many=True)
-        result = self.get_paginated_response(serializer.data)
-        data = result.data
+        serializer = ListUserSerializer(user_profiles, many=True)
         response = {
             "status": True,
             "message": "Mobile User fetch Successfully",
-            "data": data,
+            "data": serializer.data,
         }
         return Response(data=response, status=status.HTTP_200_OK)
 
 
-class GetUserByNameView(ListAPIView):
+class GetUserByNameView(APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
-    serializer_class = ListUserSerializer
 
     def get(self, request):
         name = request.query_params.get("name")
         user_profiles = UserProfile.objects.filter(
             user__first_name__startswith=name).exclude(user__username=request.user, user__is_superuser=True)
-        page = self.paginate_queryset(user_profiles)
-        serializer = self.serializer_class(page, many=True)
-        result = self.get_paginated_response(serializer.data)
-        data = result.data
+        serializer = ListUserSerializer(user_profiles, many=True)
         response = {
             "status": True,
             "message": "Retrive User by name fetch successfully",
-            "data": data,
+            "data": serializer.data,
         }
         return Response(data=response, status=status.HTTP_200_OK)

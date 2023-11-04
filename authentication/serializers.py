@@ -24,15 +24,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     # address = serializers.CharField(required=False)
     # gender = serializers.CharField(required=False)
     # geo_location = serializers.CharField(required=False)
-    email = serializers.EmailField(
-        required=True,
-        validators=[
-            UniqueValidator(
-                queryset=User.objects.all(),
-                message=("Email already exists"),
-            )
-        ],
-    )
+    email = serializers.EmailField(required=True)
     name = serializers.CharField(required=True)
     # profile_picture = serializers.CharField(required=False)
     # phone_number = serializers.CharField(required=False,
@@ -103,6 +95,10 @@ class RegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"error": ["Please enter valid login type"]}
             )
+        if User.objects.filter(email=attrs.get("email")).exists():
+            raise serializers.ValidationError({
+                "error":["Email already exists"]
+            })
         if UserProfile.objects.filter(
             user__email=attrs.get("email"),
             login_type="2",

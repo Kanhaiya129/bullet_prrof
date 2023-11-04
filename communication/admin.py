@@ -3,7 +3,7 @@ from .models import FriendUser, BlockUser
 
 @admin.register(FriendUser)
 class FriendUserAdmin(admin.ModelAdmin):
-    list_display=["user","friend","status"]
+    list_display=["user","friend","invited_by","status"]
 
 
 @admin.register(BlockUser)

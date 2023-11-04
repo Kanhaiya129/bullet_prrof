@@ -1,17 +1,17 @@
 from rest_framework import serializers
-from .models import FriendUser
+from .models import FriendUser, BlockUser
 from authentication.models import UserProfile
 from django.contrib.auth.models import User
 
 
-class UserSerializer(serializers.ModelSerializer):
+class BlockUserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = ["id", "username", "email"]
+        model = BlockUser
+        fields = ["id", "blocked_user"]
 
 
 class FriendInvitationSerializer(serializers.ModelSerializer):
-    friend_name = serializers.CharField(source="friend.first_name")
+    friend_name = serializers.CharField(source="user.first_name")
     friend_image = serializers.SerializerMethodField()
 
     class Meta:
@@ -20,7 +20,7 @@ class FriendInvitationSerializer(serializers.ModelSerializer):
 
     def get_friend_image(self, obj):
         # Define how to get the friend's profile picture URL
-        user_obj = UserProfile.objects.get(user=obj.friend)
+        user_obj = UserProfile.objects.get(user=obj.user)
         if user_obj.profile_pic:
             return user_obj.profile_pic.url
         return None
@@ -43,13 +43,17 @@ class FriendSuggestionSerializer(serializers.ModelSerializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer()
+    id = serializers.IntegerField(source='user.id')
+    username = serializers.CharField(source='user.username')
+    email = serializers.EmailField(source='user.email')
     profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
         fields = (
-            "user",
+            "id",
+            "username",
+            "email",
             "profile_picture",
             "phone_number",
             "online_status",
